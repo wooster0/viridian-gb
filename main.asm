@@ -1,7 +1,8 @@
 ; Viridian from VVVVVV!
 
-; In this file coordinate order is: Y, X.
-
+; `hardware.inc` is a general file of Game Boy-specific hardware definitions used in many Game Boy games.
+; The original can be found here: <https://github.com/gbdev/hardware.inc>.
+; Using the constants defined in that file instead of the addresses directly improves clarity and readability.
 INCLUDE "hardware.inc"
 
 DEF TILE_WIDTH EQU 8
@@ -16,6 +17,7 @@ SECTION "OAM data", WRAM0, ALIGN[8]
     ; -Byte 4: Flags
     ; That's 4 bytes which we allocate using `DS 4`.
 wOAMBuffer:
+    ; Viridian is made up of multiple objects because one sprite has a size of 8x16 (configured using LCDCF_OBJ16) but Viridian has a size of 10x21.
     .viridian1 DS 4
     .viridian2 DS 4
     .viridian3 DS 4
@@ -24,7 +26,9 @@ wOAMBuffer:
     .end ; Local labels use camelCase
 
 SECTION "Viridian", HRAM
-ViridianNeedsAlignment: DS 1
+; For facing the right direction, mirroring the sprites using the flip flag of the objects alone is not enough.
+; `viridian2` and `viridian4` need to be moved once to be aligned properly and for that we use this "boolean" to know whether they've been moved or not.
+hViridianNeedsAlignment: DS 1
 
 SECTION "VBlank interrupt", ROM0[$0040]
     jp VBlankHandler
@@ -36,16 +40,17 @@ SECTION "Header", ROM0[$0100]
 
 SECTION "VBlank handler", ROM0
 VBlankHandler:
-    ; Preserve state
+    ; Preserve state.
     push af
 
     call hOAMDMACopyRoutine
 
 MoveViridian:
+    ; Read the directional buttons.
     ld a, P1F_GET_DPAD
     ld [rP1], a
 
-    ; No input stabilization
+    ; No input stabilization.
     ld a, [rP1]
 
     ; The input is saved in `d` as well for later because `a` will be overwritten before it's needed again.
@@ -85,7 +90,7 @@ MoveViridian:
     inc hl ; Flags
     res 5, [hl]
 
-    ld a, [ViridianNeedsAlignment]
+    ldh a, [hViridianNeedsAlignment]
     cp 1
     jr nz, .skipMoveLeft
 
@@ -97,7 +102,7 @@ MoveViridian:
     ld [wOAMBuffer.viridian4 + 1], a
 
     xor a
-    ld [ViridianNeedsAlignment], a
+    ldh [hViridianNeedsAlignment], a
 
 .skipMoveLeft
     ; The Right button
@@ -134,7 +139,7 @@ MoveViridian:
     inc hl ; Flags
     set 5, [hl]
 
-    ld a, [ViridianNeedsAlignment]
+    ldh a, [hViridianNeedsAlignment]
     and a
     jr nz, .skipMoveRight
 
@@ -146,7 +151,7 @@ MoveViridian:
     ld [wOAMBuffer.viridian4 + 1], a
 
     ld a, 1
-    ld [ViridianNeedsAlignment], a
+    ldh [hViridianNeedsAlignment], a
 
 .skipMoveRight
 
@@ -154,7 +159,6 @@ MoveViridian:
     reti ; Now we return and re-enable interrupts
 
 SECTION "Main", ROM0
-
 Start: ; Labels use PascalCase
     ; Turn off the LCD:
     ; We can't turn off the LCD before we are in the VBlank period.
@@ -174,14 +178,14 @@ DisableLCD:
     ld [rNR52], a
 
     ; Setup state
-    ld [ViridianNeedsAlignment], a
+    ldh [hViridianNeedsAlignment], a
 
     ; Reset scrolling
     ld [rSCX], a
     ld [rSCY], a
 
     ; Clear the OAM memory.
-    ; If we don't do this, we would get weird artifacts on the screen.
+    ; If we don't do this, we will get weird artifacts on the screen.
 ClearOAMSetup:
     ld hl, wOAMBuffer
     ld c, wOAMBuffer.end - wOAMBuffer
@@ -288,7 +292,6 @@ hOAMDMACopyRoutine:
 ENDL
 
 SECTION "Graphics", ROM0
-
 ; This allows writing dots instead of zeroes for the graphics.
 OPT g.123
 
