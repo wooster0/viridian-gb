@@ -6,9 +6,11 @@ build:
 	# `-p 0xFF` ensures the ROM is padded to a valid size and it sets the corresponding value in the "ROM size" header field.
 	rgbfix -v -p 0xFF viridian.gb
 
-run: # You can uncomment your preferred emulator
-	# sudo java -jar ../Emulicious.jar viridian.gb
+run_bgb:
 	wine ../bgb/bgb64.exe viridian.gb
+
+run_emulicious:
+	java -jar ../Emulicious.jar viridian.gb
 
 clean:
 	rm viridian.o viridian.gb
